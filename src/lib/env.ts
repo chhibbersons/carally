@@ -25,6 +25,9 @@ const coreSchema = z.object({
   AI_MODEL_FAST: z.string().default("claude-haiku-5-5"),
   AI_MODEL_SMART: z.string().default("claude-sonnet-5-5"),
   TZ_DISPLAY: z.string().default("Asia/Kolkata"),
+  WA_GRAPH_API_VERSION: optionalString
+    .transform((v) => v ?? "v24.0")
+    .pipe(z.string().regex(/^v\d+\.\d+$/, "Use a version like v24.0")),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 });
 
