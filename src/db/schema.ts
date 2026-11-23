@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -18,8 +19,7 @@ import {
  * index that starts with it (§2, §6). Read and write those tables through
  * `forDealer()` in ./tenant.ts, never directly.
  *
- * Later MVP steps add vehicles, kb_entries, contacts, leads, conversations,
- * messages, visits and followup_runs.
+ * Later MVP steps add vehicles, kb_entries, leads, visits and followup_runs.
  */
 
 export const planEnum = pgEnum("plan", ["starter", "growth", "pro"]);
@@ -45,8 +45,16 @@ export const dealers = pgTable("dealers", {
   timezone: text("timezone").notNull().default("Asia/Kolkata"),
   languages: text("languages").array().$type<Language[]>().notNull().default(sql`'{en}'`),
   aiEnabled: boolean("ai_enabled").notNull().default(false),
+  /**
+   * The dealer's own WhatsApp access token, encrypted with src/lib/crypto.ts.
+   * When empty, sends use the platform's WA_SYSTEM_USER_TOKEN.
+   */
+  waAccessTokenEnc: text("wa_access_token_enc"),
   createdAt: createdAt(),
-});
+}, (t) => [
+  // Incoming webhooks are routed to a dealer by this id, so it must be unique.
+  unique("dealers_wa_phone_number_id_unique").on(t.whatsappPhoneNumberId),
+]);
 
 /** Opening hours per weekday, in the dealer's local time ("09:30"–"19:00"). */
 export type BranchHours = Partial<
@@ -112,6 +120,101 @@ export const auditLog = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// WhatsApp: contacts (buyers), one conversation per contact, and messages.
+// ---------------------------------------------------------------------------
+
+export const messageDirectionEnum = pgEnum("message_direction", ["in", "out"]);
+export const messageSenderEnum = pgEnum("message_sender", ["buyer", "ai", "staff", "system"]);
+export const messageStatusEnum = pgEnum("message_status", ["sent", "delivered", "read", "failed"]);
+export const costCategoryEnum = pgEnum("cost_category", ["service", "utility", "marketing"]);
+
+export type MessageDirection = (typeof messageDirectionEnum.enumValues)[number];
+export type MessageSender = (typeof messageSenderEnum.enumValues)[number];
+export type MessageStatus = (typeof messageStatusEnum.enumValues)[number];
+export type CostCategory = (typeof costCategoryEnum.enumValues)[number];
+
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealerId: uuid("dealer_id")
+      .notNull()
+      .references(() => dealers.id, { onDelete: "cascade" }),
+    phoneE164: text("phone_e164").notNull(),
+    name: text("name"),
+    languagePref: text("language_pref").$type<Language>(),
+    optedOut: boolean("opted_out").notNull().default(false),
+    optedOutAt: timestamp("opted_out_at", { withTimezone: true }),
+    /** Time of the buyer's latest message. Drives the 24-hour window (src/whatsapp/window.ts). */
+    lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("contacts_dealer_phone_unique").on(t.dealerId, t.phoneE164)],
+);
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealerId: uuid("dealer_id")
+      .notNull()
+      .references(() => dealers.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    aiPaused: boolean("ai_paused").notNull().default(false),
+    pausedBy: uuid("paused_by").references(() => users.id, { onDelete: "set null" }),
+    pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("conversations_dealer_contact_unique").on(t.dealerId, t.contactId)],
+);
+
+/** Media we received (Meta media id) or sent (public URL). */
+export type MessageMedia = {
+  id?: string;
+  url?: string;
+  mimeType?: string;
+  caption?: string;
+  filename?: string;
+};
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealerId: uuid("dealer_id")
+      .notNull()
+      .references(() => dealers.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    direction: messageDirectionEnum("direction").notNull(),
+    sender: messageSenderEnum("sender").notNull(),
+    /** WhatsApp message type: text, image, video, template, button, … */
+    type: text("type").notNull(),
+    body: text("body"),
+    media: jsonb("media").$type<MessageMedia>(),
+    /** Meta's message id ("wamid…"). Unique per dealer, which dedupes repeated webhooks. */
+    waMessageId: text("wa_message_id"),
+    templateName: text("template_name"),
+    /** Delivery status of outbound messages; null for inbound. */
+    status: messageStatusEnum("status"),
+    /** Meta's error code and title when a send failed. */
+    error: text("error"),
+    /** Set on outbound messages, for the per-dealer cost report. */
+    costCategory: costCategoryEnum("cost_category"),
+    createdAt: createdAt(),
+    statusUpdatedAt: timestamp("status_updated_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("messages_dealer_wa_message_id_unique").on(t.dealerId, t.waMessageId),
+    index("messages_dealer_conversation_created_idx").on(t.dealerId, t.conversationId, t.createdAt),
+    index("messages_dealer_created_idx").on(t.dealerId, t.createdAt),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Auth.js tables (shape required by @auth/drizzle-adapter). These hold login
 // state only, not dealer data.
 // ---------------------------------------------------------------------------
@@ -162,3 +265,6 @@ export type Dealer = typeof dealers.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type AuditEntry = typeof auditLog.$inferSelect;
+export type Contact = typeof contacts.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type Message = typeof messages.$inferSelect;

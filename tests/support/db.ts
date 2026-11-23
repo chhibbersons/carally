@@ -12,7 +12,7 @@ export function useTestDb(): () => Db {
   beforeEach(async () => {
     handle ??= createDb(url!);
     await handle.db.execute(
-      sql`truncate table audit_log, auth_sessions, auth_accounts, auth_verification_tokens, users, branches, dealers cascade`,
+      sql`truncate table messages, conversations, contacts, audit_log, auth_sessions, auth_accounts, auth_verification_tokens, users, branches, dealers cascade`,
     );
   });
   afterAll(async () => {
