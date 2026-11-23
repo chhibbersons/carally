@@ -1,6 +1,7 @@
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import path from "node:path";
 import { createDb } from "./client";
+import { pathToFileURL } from "node:url";
 
 /** Applies pending migrations from src/db/migrations. */
 export async function runMigrations(url: string) {
@@ -12,7 +13,8 @@ export async function runMigrations(url: string) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run only when called as a script. pathToFileURL handles Windows paths (C:\...).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error("DATABASE_URL is not set");

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { createDb, type Db } from "./client";
 import { createDealer, findUserByEmail } from "./operator";
 import { dealers, users, type BranchHours } from "./schema";
+import { pathToFileURL } from "node:url";
 
 /**
  * Seeds the operator account and the "Demo Motors, Andheri" dealer.
@@ -59,7 +60,8 @@ export async function seed(db: Db, operatorEmail: string) {
   return { operatorEmail: operator.email };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run only when called as a script. pathToFileURL handles Windows paths (C:\...).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error("DATABASE_URL is not set");
