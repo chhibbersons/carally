@@ -59,7 +59,11 @@ export default async function DealersPage({ searchParams }: PageProps<"/operator
             <TableBody>
               {dealerRows.map((d) => (
                 <TableRow key={d.id} className={d.id === created ? "bg-muted/60" : undefined}>
-                  <TableCell className="font-medium">{d.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/operator/dealers/${d.id}`} className="hover:underline">
+                      {d.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{d.city}</TableCell>
                   <TableCell>
                     <Badge className="capitalize">{d.plan}</Badge>

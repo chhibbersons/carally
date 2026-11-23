@@ -31,7 +31,7 @@ owner login `admin@demomotors.example`.
 | `pnpm db:generate` | Create a migration after changing `src/db/schema.ts` |
 | `pnpm db:migrate` | Apply migrations |
 | `pnpm db:seed` | Operator account + demo dealer (safe to re-run) |
-| `pnpm worker` | Background worker (placeholder until follow-ups are built) |
+| `pnpm worker` | Background worker. Processes incoming WhatsApp messages; keep it running next to `pnpm dev` |
 | `pnpm test` | Unit tests. Database tests run only when `TEST_DATABASE_URL` is set |
 | `pnpm e2e` | Playwright checks (needs the database) |
 | `pnpm lint && pnpm typecheck` | Lint and type check |
@@ -41,4 +41,9 @@ owner login `admin@demomotors.example`.
 - `app/` routes: `/login`, `/operator/dealers` (operator console), `/dashboard` (dealer users)
 - `src/db/schema.ts` tables; `src/db/tenant.ts` `forDealer()` for all dealer data; `src/db/operator.ts` cross-dealer queries for the operator console
 - `src/auth/` Auth.js setup and `requireOperator()` / `requireDealerUser()` guards
-- `src/lib/` env validation, logger (masks phone numbers), phone and IST time helpers
+- `src/lib/` env validation, logger (masks phone numbers), phone and IST time helpers, `crypto.ts` (encrypts stored tokens)
+- `src/whatsapp/` WhatsApp Cloud API: `webhook.ts` (signature check, parsing), `inbound.ts` (stores messages, STOP/START), `client.ts` (sending), `window.ts` (24-hour window, opt-out and quiet-hours rules every send goes through), `templates.ts` (approved templates and system copy)
+- `src/jobs/` pg-boss queue and the worker
+- `app/api/webhooks/whatsapp` Meta's webhook; `/operator/dealers/[id]` connects a dealer's number and sends a test message
+
+To connect a real WhatsApp number, follow [docs/whatsapp-setup.md](./docs/whatsapp-setup.md).
