@@ -1,0 +1,27 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "102290129340398",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": { "display_phone_number": "15550783881", "phone_number_id": "106540352242922" },
+            "contacts": [{ "profile": { "name": "Test Buyer" }, "wa_id": "919800000001" }],
+            "messages": [
+              {
+                "from": "919800000001",
+                "id": "wamid.HBgMOTE5ODAwMDAwMDAxFQIAEhggQTFCMkMzRDRFNUY2",
+                "timestamp": "1795430000",
+                "text": { "body": "Creta under 10 lakh hai kya?" },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
